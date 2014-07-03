@@ -1,5 +1,14 @@
 <?php
 
+function autoload_elements($class) {
+	include('elements/' . $class . '.class.php');
+}
+function autoload_widgets($class) {
+	include('widgets/' . $class . '.class.php');
+}
+spl_autoload_register('autoload_elements');
+spl_autoload_register('autoload_widgets');
+
 class Element {
 	//Required
 	public $attrs = array();
@@ -342,6 +351,20 @@ class Element {
 		} else {
 			echo $print_string;
 			return $this;
+		}
+	}
+
+	//Helper functions ---------------------------------------------------------
+	public function array_wrap(&$el) {
+		if (!is_array($el)) {
+			$el = array( $el );
+		}
+	}
+
+	public function build_inner($inner) {
+		$this->array_wrap($inner);
+		foreach ($inner as $el) {
+			$this->append($el);
 		}
 	}
 }
