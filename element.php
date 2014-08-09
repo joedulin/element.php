@@ -119,6 +119,11 @@ class Element {
 		return $this;
 	}
 
+	//Just so the function can be used interchangably. Redefined in many classes
+	public function addItem ($els) {
+		$this->append($els);
+	}
+
 	public function prepend ($elements) {
 		if (!is_array($elements)) {
 			$elements = array( $elements );
