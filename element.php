@@ -110,6 +110,13 @@ class Element {
 	//Manipulate inner -------------------------------------------------
 
 	public function append ($elements) {
+		if (gettype($elements) == 'string') {
+			$regex = '/<(.[^\s]*)(.[^><]*)?>(.*?)?<\/\1>/is';
+			$found = preg_match_all($regex, $elements, $content);
+			if ($found) {
+				return $this->append($this->parse($elements));
+			}
+		}
 		if (!is_array($elements)) {
 			$elements = array( $elements );
 		}
@@ -125,6 +132,13 @@ class Element {
 	}
 
 	public function prepend ($elements) {
+		if (gettype($elements) == 'string') {
+			$regex = '/<(.[^\s]*)(.[^><]*)?>(.*?)?<\/\1>/is';
+			$found = preg_match_all($regex, $elements, $content);
+			if ($found) {
+				return $this->prepend($this->parse($elements));
+			}
+		}
 		if (!is_array($elements)) {
 			$elements = array( $elements );
 		}
@@ -168,6 +182,13 @@ class Element {
 	}
 
 	public function before ($reference, $new) {
+		if (gettype($new) == 'string') {
+			$regex = '/<(.[^\s]*)(.[^><]*)?>(.*?)?<\/\1>/is';
+			$found = preg_match_all($regex, $new, $content);
+			if ($found) {
+				return $this->before($reference, $this->parse($new));
+			}
+		}
 		if (is_array($new)) {
 			foreach ($new as $el) {
 				$this->before($reference, $el);
@@ -196,6 +217,13 @@ class Element {
 	}
 
 	public function after ($reference, $new) {
+		if (gettype($new) == 'string') {
+			$regex = '/<(.[^\s]*)(.[^><]*)?>(.*?)?<\/\1>/is';
+			$found = preg_match_all($regex, $new, $content);
+			if ($found) {
+				return $this->after($reference, $this->parse($new));
+			}
+		}
 		if (is_array($new)) {
 			foreach ($new as $el) {
 				$this->after($reference, $el);
@@ -359,6 +387,73 @@ class Element {
 		}
 	}
 
+	public function parse($html) {
+		$single = 'meta|img|hr|br|link|!--|!DOCTYPE|input';
+		$html = preg_replace('/<('.$single.')(.[^><]*)?>/is', '<\1\2></\1>', $html);
+		
+		$regex = '/<(.[^\s]*)(.[^><]*)?>(.*?)?<\/\1>/is';
+		$found = preg_match_all($regex, $html, $content);
+		$ret = array();
+		if ($found) {
+			foreach ($content[1] as $index => $root_tag) {
+				$string_attrs = $content[2][$index];
+				$remaining = $content[3][$index];
+
+				$classes = array();
+				$styles = array();
+				$attrs = array();
+
+				$array_attrs = preg_split('/\s(?=[^"]*("[^"]*"[^"]*)*$)/', $string_attrs);
+				foreach ($array_attrs as $attr) {
+					if (strlen(trim($attr)) < 1) {
+						continue;
+					}
+					$attr = str_replace('"', '', $attr);
+					$attr = explode('=', $attr);
+					switch ($attr[0]) {
+						case 'class':
+							$classes = explode(' ', $attr[1]);
+							break;
+						case 'style':
+							$s_arr = explode(';', $attr[1]);
+							foreach ($s_arr as $style) {
+								$style = str_replace(' ', '', $style);
+								$style = explode(':', $style);
+								if (isset($style[1])) {
+									$styles[$style[0]] = $style[1];
+								}
+							}
+							break;
+						default:
+							$attrs[$attr[0]] = $attr[1];
+							break;
+					}
+				}
+				$opts = array(
+					'classes' => $classes,
+					'styles' => $styles,
+					'attrs' => $attrs
+				);
+				if (strlen($remaining) > 0) {
+					$opts['inner'] = $this->parse($remaining);
+					if (!is_array($opts['inner'])) {
+						$opts['inner'] = array( $opts['inner'] );
+					}
+				} else {
+					$opts['inner'] = array();
+				}
+				$ret[] = new Element($root_tag, $opts);
+			}
+		} else {
+			if ($html && strlen($html) > 0) {
+				return $html;
+			} else {
+				return false;
+			}
+		}
+		return $ret;
+	}
+
 	//Helper functions ---------------------------------------------------------
 	public function array_wrap(&$el) {
 		if (!is_array($el)) {
@@ -371,5 +466,86 @@ class Element {
 		foreach ($inner as $el) {
 			$this->append($el);
 		}
+	}
+
+	//Static functions -------------------------------------------------
+	public static function load($html) {
+		$single = 'meta|img|hr|br|link|!--|!DOCTYPE|input';
+		$html = preg_replace('/<('.$single.')(.[^><]*)?>/is', '<~\1\2></~\1>', $html);
+		
+		$regex = '/<(.[^\s]*)(.[^><]*)?>(.*?)?<\/\1>/is';
+		$found = preg_match_all($regex, $html, $content);
+		$ret = array();
+		if ($found) {
+			foreach ($content[1] as $index => $root_tag) {
+				if (strpos($root_tag, '~') !== false) {
+					$root_tag = str_replace('~', '', $root_tag);
+					$noclose = true;
+				} else {
+					$noclose = false;
+				}
+				$string_attrs = $content[2][$index];
+				$remaining = $content[3][$index];
+
+				$classes = array();
+				$styles = array();
+				$attrs = array();
+
+				$array_attrs = preg_split('/\s(?=[^"]*("[^"]*"[^"]*)*$)/', $string_attrs);
+				foreach ($array_attrs as $attr) {
+					if (strlen(trim($attr)) < 1) {
+						continue;
+					}
+					$attr = str_replace('"', '', $attr);
+					$attr = explode('=', $attr);
+					switch ($attr[0]) {
+						case 'class':
+							$classes = explode(' ', $attr[1]);
+							break;
+						case 'style':
+							$s_arr = explode(';', $attr[1]);
+							foreach ($s_arr as $style) {
+								$style = str_replace(' ', '', $style);
+								$style = explode(':', $style);
+								if (isset($style[1])) {
+									$styles[$style[0]] = $style[1];
+								}
+							}
+							break;
+						default:
+							$attrs[$attr[0]] = $attr[1];
+							break;
+					}
+				}
+				$opts = array(
+					'classes' => $classes,
+					'styles' => $styles,
+					'attrs' => $attrs
+				);
+				if (strlen($remaining) > 0) {
+					$opts['inner'] = self::load($remaining);
+					if (!is_array($opts['inner'])) {
+						$opts['inner'] = array( $opts['inner'] );
+					}
+				} else {
+					$opts['inner'] = array();
+				}
+				$el = new Element($root_tag, $opts);
+				if ($noclose) {
+					$el->requires_close = false;
+				}
+				$ret[] = $el;
+			}
+		} else {
+			if ($html && strlen($html) > 0) {
+				return $html;
+			} else {
+				return false;
+			}
+		}
+		if (count($ret) == 1) {
+			$ret = $ret[0];
+		}
+		return $ret;
 	}
 }
